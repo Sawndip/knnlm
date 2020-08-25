@@ -15,19 +15,15 @@
 #include	<cmath>
 #include	<omp.h>
 using	namespace	std;
-const	unsigned	kmer=32;
+const	unsigned	kmer=64;
 
 int	fd;
 struct	stat	sb;
 uint8_t	*data;
 uint64_t	data_size,	threads;
 double	mean;
-
-#ifdef	__AVX2__
-__m256i	weight;
-#else
 uint8_t	w[kmer];
-#endif
+
 uint64_t	open_mmap(const	char	*F){
 	fd=open(F,	O_RDONLY);	if(fd<0)	return	0;
 	fstat(fd,	&sb);
@@ -42,14 +38,9 @@ void	close_mmap(void){
 }
 
 double	score(uint8_t	*p,	uint8_t	*q){
-#ifdef	__AVX2__
-	__m256i	s=_mm256_sad_epu8(_mm256_and_si256(_mm256_cmpeq_epi8(_mm256_loadu_si256((__m256i_u*)(p-31)),_mm256_loadu_si256((__m256i_u*)(q-31))),weight),_mm256_setzero_si256());
-	return	uint32_t(_mm256_extract_epi32(s, 0))+uint32_t(_mm256_extract_epi32(s, 2))+uint32_t(_mm256_extract_epi32(s, 4)) +uint32_t(_mm256_extract_epi32(s, 6));
-#else
 	size_t	s=0;	uint8_t	*a=p-kmer+1,	*b=q-kmer+1;
 	for(size_t	i=0;	i<kmer;	i++)	s+=w[i]*(a[i]==b[i]);
 	return	s;
-#endif
 }
 
 double	predict(uint8_t	*p,	double	*prob,	double	alpha){
@@ -69,9 +60,6 @@ double	predict(uint8_t	*p,	double	*prob,	double	alpha){
 }
 
 double	normalize(double	beta){
-#ifdef	__AVX2__
-	uint8_t	*w=(uint8_t*)&weight;
-#endif
 	for(size_t	i=0;	i<kmer;	i++)	w[i]=powf(beta,kmer-1-i)*255;
 	double	x,	sx=0,	sxx=0,	sn=0;	uint64_t	seed=0;
 	for(size_t	k=0;	k<0x100000;	k++){
@@ -88,14 +76,14 @@ void	document(void){
 	cerr<<"usage:	knnlm [options] [word1 word2 ...]\n";
 	cerr<<"\t-t:	text file=data.txt\n";
 	cerr<<"\t-a:	sampling temperature=2\n";
-	cerr<<"\t-d:	kmer weight decay=0.84\n";
+	cerr<<"\t-d:	kmer weight decay=0.92\n";
 	cerr<<"\t-T:	number of threads=auto\n";
 	cerr<<"\t-b	benckmark=off\n";
 	exit(0);
 }
 
 int	main(int	ac,	char	**av){
-	uint64_t	seed=time(NULL);	string	file="data.txt";	double	alpha=2,	beta=0.84;	bool	bench=false;	threads=omp_get_num_procs();
+	uint64_t	seed=time(NULL);	string	file="data.txt";	double	alpha=2,	beta=0.92;	bool	bench=false;	threads=omp_get_num_procs();
 	if(ac<2)	document();
 	int	opt;
 	while((opt=getopt(ac,	av,	"t:a:d:T:b"))>=0){
