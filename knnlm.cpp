@@ -78,21 +78,21 @@ void	document(void){
 	cerr<<"\t-a:	sampling temperature=2\n";
 	cerr<<"\t-d:	kmer weight decay=0.92\n";
 	cerr<<"\t-T:	number of threads=auto\n";
-	cerr<<"\t-b	benckmark=off\n";
+	cerr<<"\t-b:	benckmark chars=0\n";
 	exit(0);
 }
 
 int	main(int	ac,	char	**av){
-	uint64_t	seed=time(NULL);	string	file="data.txt";	double	alpha=2,	beta=0.92;	bool	bench=false;	threads=omp_get_num_procs();
+	uint64_t	seed=time(NULL);	string	file="data.txt";	double	alpha=2,	beta=0.92;	size_t	bench=0;	threads=omp_get_num_procs();
 	if(ac<2)	document();
 	int	opt;
-	while((opt=getopt(ac,	av,	"t:a:d:T:b"))>=0){
+	while((opt=getopt(ac,	av,	"t:a:d:T:b:"))>=0){
 		switch(opt){
 		case	't':	file=optarg;	break;
 		case	'a':	alpha=atof(optarg);	break;
 		case	'd':	beta=atof(optarg);	break;
 		case	'T':	threads=atoi(optarg);	break;
-		case	'b':	bench=true;	break;
+		case	'b':	bench=atoi(optarg);	break;
 		default:	document();
 		}
 	}
@@ -123,16 +123,16 @@ int	main(int	ac,	char	**av){
 		cerr<<"benchmarking\n";
 		timeval	beg,	end;
 		gettimeofday(&beg,NULL);
-		unsigned	sn=1000;	double	sx=0;
-		for(size_t	i=0;	i<sn;	i++){
+		double	sx=0;
+		for(size_t	i=0;	i<bench;	i++){
 			double	prob[256];
-			unsigned	j=wyrand(&seed)%(data_size-kmer-2)+kmer-1;
+			unsigned	j=wyrand(&seed)%(data_size-kmer-1)+kmer-1;
 			double	l=predict(data+j,prob,alpha);
 			sx+=l;
 		}
 		gettimeofday(&end,NULL);
 		double	dt=end.tv_sec-beg.tv_sec+1e-6*(end.tv_usec-beg.tv_usec);
-		cerr<<"\nloss:\t"<<sx/sn<<" bits/byte\nspeed:\t"<<sn/dt<<" chars/sec\n";
+		cerr<<"\nloss:\t"<<sx/bench<<" bits/byte\nspeed:\t"<<bench/dt<<" chars/sec\n";
 
 	}
 	close_mmap();
