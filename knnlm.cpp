@@ -21,7 +21,7 @@ int	fd;
 struct	stat	sb;
 uint8_t	*data;
 uint64_t	data_size,	threads,	seed;
-double	ma=0;
+double	mean;
 uint8_t	w[kmer];
 
 uint64_t	open_mmap(const	char	*F){
@@ -49,8 +49,9 @@ double	predict(uint8_t	*p,	double	*prob,	double	alpha){
 	for(size_t	i=kmer-1;	i<data_size-1;	i++)	
 		if(data[i]==*p&&data+i!=p){
 		//if(*(uint16_t*)(data+i-1)==*(uint16_t*)(p-1)&&data+i!=p){
-		double	s=exp((score(data+i,p)-ma)*alpha);
-		pr[(omp_get_thread_num()<<8)+data[i+1]]+=s*s;
+		double	s=(score(data+i,p)-mean)*alpha;
+		s=exp(s);		
+		pr[(omp_get_thread_num()<<8)+data[i+1]]+=s;
 	}
 	memset(prob,0,256*sizeof(double));
 	for(size_t	i=0;	i<threads;	i++)	for(size_t	j=0;	j<256;	j++)	prob[j]+=pr[(i<<8)+j];
@@ -58,11 +59,11 @@ double	predict(uint8_t	*p,	double	*prob,	double	alpha){
 	for(size_t	i=0;	i<256;	i++)	sp+=(prob[i]+=DBL_MIN);
 	sp=1/sp;
 	for(size_t  i=0;    i<256;  i++)	prob[i]*=sp;
-	return	-log2(fmaxf(prob[*(p+1)],DBL_MIN));
+	return	-log2(fmax(prob[*(p+1)],DBL_MIN));
 }
 
 double	normalize(double	beta){
-	for(size_t	i=0;	i<kmer;	i++)	ma+=(w[i]=powf(beta,kmer-1-i)*255);
+	for(size_t	i=0;	i<kmer;	i++)	w[i]=powf(beta,kmer-1-i)*255;
 	double	x,	sx=0,	sxx=0,	sn=0x100000;
 	for(size_t	k=0;	k<0x100000;	k++){
 		size_t	i=wyrand(&seed)%(data_size-kmer-2)+kmer-1,j;
@@ -71,7 +72,7 @@ double	normalize(double	beta){
 		sx+=x;	
 		sxx+=x*x;
 	}
-	sx/=sn;
+	sx/=sn;	mean=sx;
 	return	sqrt(sxx/sn-sx*sx);
 }
 
