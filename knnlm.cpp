@@ -37,7 +37,7 @@ void	close_mmap(void){
 	munmap(data,sb.st_size);	close(fd);
 }
 
-static  inline	double	score(uint8_t	*p,	uint8_t	*q){
+static	inline	double	score(uint8_t	*p,	uint8_t	*q){
 	size_t	s=0;	uint8_t	*a=p-kmer+1,	*b=q-kmer+1;
 	for(size_t	i=0;	i<kmer;	i++)	s+=w[i]*(a[i]==b[i]);
 	return	s;
@@ -49,7 +49,7 @@ double	predict(uint8_t	*p,	double	*prob,	double	alpha){
 	for(size_t	i=kmer-1;	i<data_size-1;	i++)	
 		if(data[i]==*p&&data+i!=p){
 		//if(*(uint16_t*)(data+i-1)==*(uint16_t*)(p-1)&&data+i!=p){
-		double	s=expf((score(data+i,p)-mean)*alpha);
+		double	s=exp((score(data+i,p)-mean)*alpha);
 		pr[(omp_get_thread_num()<<8)+data[i+1]]+=s;
 	}
 	memset(prob,0,256*sizeof(double));
@@ -58,17 +58,21 @@ double	predict(uint8_t	*p,	double	*prob,	double	alpha){
 	for(size_t	i=0;	i<256;	i++)	sp+=(prob[i]+=FLT_MIN);
 	sp=1/sp;
 	for(size_t  i=0;    i<256;  i++)	prob[i]*=sp;
-	return	-log2f(fmaxf(prob[*(p+1)],FLT_MIN));
+	return	-log2(fmaxf(prob[*(p+1)],FLT_MIN));
 }
 
 double	normalize(double	beta){
 	for(size_t	i=0;	i<kmer;	i++)	w[i]=powf(beta,kmer-1-i)*255;
-	double	x,	sx=0,	sxx=0,	sn=0;
-	for(size_t	k=0;	k<0x100000;	k++){
+	double	x,	sx=0,	sxx=0,	sn=0x1000000;
+	#pragma omp parallel for
+	for(size_t	k=0;	k<0x1000000;	k++){
 		size_t	i=wyrand(&seed)%(data_size-kmer-2)+kmer-1,j;
 		do	j=wyrand(&seed)%(data_size-kmer-2)+kmer-1;	while(j==i);
 		x=score(data+i,data+j);
-		sx+=x;	sxx+=x*x;	sn+=1;
+		#pragma omp atomic
+		sx+=x;	
+		#pragma omp atomic
+		sxx+=x*x;
 	}
 	sx/=sn;	mean=sx;
 	return	sqrt(sxx/sn-sx*sx);
