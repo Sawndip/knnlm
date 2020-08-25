@@ -37,7 +37,7 @@ void	close_mmap(void){
 	munmap(data,sb.st_size);	close(fd);
 }
 
-double	score(uint8_t	*p,	uint8_t	*q){
+static  inline	double	score(uint8_t	*p,	uint8_t	*q){
 	size_t	s=0;	uint8_t	*a=p-kmer+1,	*b=q-kmer+1;
 	for(size_t	i=0;	i<kmer;	i++)	s+=w[i]*(a[i]==b[i]);
 	return	s;
