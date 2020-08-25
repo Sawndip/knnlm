@@ -17,7 +17,7 @@ To enable AVX2 instructions, please edit makefile
 
 **Benchmark language model with BPC(Bits per Char)**
 
-./knnlm -t input.txt -b
+./knnlm -t input.txt -b 1000
 
 **Enjoy!**
 
