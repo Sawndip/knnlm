@@ -79,7 +79,7 @@ double	normalize(double	beta){
 void	document(void){
 	cerr<<"usage:	knnlm [options] [word1 word2 ...]\n";
 	cerr<<"\t-t:	text file=data.txt\n";
-	cerr<<"\t-a:	sampling temperature=2\n";
+	cerr<<"\t-a:	sampling temperature=2.718\n";
 	cerr<<"\t-d:	kmer weight decay=auto\n";
 	cerr<<"\t-T:	number of threads=auto\n";
 	cerr<<"\t-b:	benckmark chars=0\n";
@@ -87,7 +87,7 @@ void	document(void){
 }
 
 int	main(int	ac,	char	**av){
-	string	file="data.txt";	double	alpha=2,	beta=exp(-log(255)/kmer);	size_t	bench=0;	threads=omp_get_num_procs();
+	string	file="data.txt";	double	alpha=2.718,	beta=exp(-log(255)/kmer);	size_t	bench=0;	threads=omp_get_num_procs();
 	if(ac<2)	document();
 	int	opt;
 	while((opt=getopt(ac,	av,	"t:a:d:T:b:"))>=0){
