@@ -16,7 +16,6 @@
 #include	<omp.h>
 using	namespace	std;
 const	unsigned	kmer=32;
-const	double	beta=0.84;
 
 int	fd;
 struct	stat	sb;
@@ -65,7 +64,7 @@ double	predict(uint8_t	*p,	double	*prob,	double	alpha){
 	return	-log2f(fmaxf(prob[*(p+1)],FLT_MIN));
 }
 
-double	normalize(void){
+double	normalize(double	beta){
 #ifdef	__AVX2__
 	uint8_t	*w=(uint8_t*)&weight;
 #endif
@@ -84,25 +83,27 @@ double	normalize(void){
 void	document(void){
 	cerr<<"usage:	knnlm [options] [word1 word2 ...]\n";
 	cerr<<"\t-t:	text file=data.txt\n";
-	cerr<<"\t-a:	alpha=2\n";
+	cerr<<"\t-a:	sampling temperature=2\n";
+	cerr<<"\t-d:	kmer weight decay=0.84\n";
 	cerr<<"\t-b	benckmark=off\n";
 	exit(0);
 }
 
 int	main(int	ac,	char	**av){
-	uint64_t	seed=time(NULL);	string	file="data.txt";	double	alpha=2;	bool	bench=false;
+	uint64_t	seed=time(NULL);	string	file="data.txt";	double	alpha=2,	beta=0.84;	bool	bench=false;
 	if(ac<2)	document();
 	int	opt;
-	while((opt=getopt(ac,	av,	"t:a:b"))>=0){
+	while((opt=getopt(ac,	av,	"t:a:d:b"))>=0){
 		switch(opt){
 		case	't':	file=optarg;	break;
 		case	'a':	alpha=atof(optarg);	break;
+		case	'd':	beta=atof(optarg);	break;
 		case	'b':	bench=true;	break;
 		default:	document();
 		}
 	}
 	if(!open_mmap(file.c_str()))	return	0;
-	alpha/=normalize();
+	alpha/=normalize(beta);
 
 	if(!bench){
 		vector<uint8_t>	v;
