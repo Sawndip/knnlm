@@ -85,7 +85,7 @@ void	document(void){
 }
 
 int	main(int	ac,	char	**av){
-	string	file="data.txt";	double	alpha=2,	beta=exp(-log(255)/(kmer-1));	size_t	bench=0;	threads=omp_get_num_procs();
+	string	file="data.txt";	double	alpha=2,	beta=exp(-log(255)/kmer);	size_t	bench=0;	threads=omp_get_num_procs();
 	if(ac<2)	document();
 	int	opt;
 	while((opt=getopt(ac,	av,	"t:a:d:T:b:"))>=0){
