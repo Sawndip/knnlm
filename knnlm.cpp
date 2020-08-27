@@ -59,6 +59,27 @@ double	predict(uint8_t	*p,	double	*prob,	double	alpha){
 	for(size_t  i=0;    i<256;  i++)	prob[i]*=sp;
 	return	-log2(fmax(prob[*(p+1)],DBL_MIN));
 }
+/*
+size_t	locate(uint8_t	*p){
+	vector<vector<size_t>	>	pos(threads);
+	vector<unsigned>	bs(threads);
+	#pragma omp parallel for
+	for(size_t	i=kmer-1;	i<data_size-1;	i++)	
+		if(data[i]==*p&&(data[i-1]==*(p-1)||data[i-2]==*(p-2))&&data+i!=p){
+		unsigned	s=score(data+i,p);
+		size_t	tid=omp_get_thread_num();
+		if(s>=bs[tid]){	bs[tid]=s;	pos[tid].clear();	}
+		if(s==bs[tid])	pos[tid].push_back(i);
+	}
+
+	size_t	bbs=0;	vector<size_t>	bpos;	
+	for(size_t	i=0;	i<threads;	i++)	for(size_t	j=0;	j<pos[i].size();	j++){
+		if(bs[i]>bbs){	bbs=bs[i];	bpos.clear();	}
+		if(bs[i]==bbs)	bpos.push_back(pos[i][j]);
+	}
+	return	bpos[wyrand(&seed)%bpos.size()];
+}
+*/
 
 double	normalize(double	beta){
 	for(size_t	i=0;	i<kmer;	i++)	w[i]=powf(beta,kmer-1-i)*255;
@@ -101,7 +122,7 @@ int	main(int	ac,	char	**av){
 	if(!open_mmap(file.c_str()))	return	0;
 	alpha/=normalize(exp(-log(255)/kmer));
 	if(!bench){
-		seed=wyhash64(time(NULL),0);
+		seed=wyhash64(time(NULL),0);		
 		ofstream	fo("article.txt");
 		vector<uint8_t>	v;
 		for(size_t	i=0;	i<kmer;	i++)	v.push_back(wyrand(&seed)&255);
