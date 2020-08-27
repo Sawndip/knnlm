@@ -9,9 +9,9 @@ This is a striking simple language model based on k-NN yet providing good result
 
 make
 
-**Generate Sample from input.txt with prefixes (I have a dream that one day) at tempature 2.5 (greater for less diversity)**
+**Generate sample from input.txt with prefixes (I have a dream that one day) with 32 mer**
 
-./knnlm -t input.txt -a 2.5 I have a dream that one day
+./knnlm -t input.txt -k 32 I have a dream that one day
 
 **Benchmark language model with BPC(Bits per Char)**
 
