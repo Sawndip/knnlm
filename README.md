@@ -9,8 +9,6 @@ This is a striking simple language model based on k-NN yet providing good result
 
 make
 
-To enable AVX2 instructions, please edit makefile
-
 **Generate Sample from input.txt with prefixes (I have a dream that one day) at tempature 2.5 (greater for less diversity)**
 
 ./knnlm -t input.txt -a 2.5 I have a dream that one day
