@@ -20,7 +20,7 @@ int	fd;
 struct	stat	sb;
 uint8_t	*data;
 uint64_t	data_size,	threads,	seed,	kmer;
-float	w[1024];
+float	w[1024],	copy_rate;
 
 uint64_t	open_mmap(const	char	*F){
 	fd=open(F,	O_RDONLY);	if(fd<0)	return	0;
@@ -48,7 +48,7 @@ double	predict(uint8_t	*p,	double	*prob){
 	for(size_t	i=kmer-1;	i<data_size-1;	i++)	if(*(uint16_t*)(data+i-1)==*(uint16_t*)(p-1)){
 		size_t	tid=omp_get_thread_num();
 		float	s=score(data+i,p);
-		if(s>0.8*sw)	continue;
+		if(s>copy_rate*sw)	continue;
 		pr[(tid<<8)+data[i+1]]+=exp(s);
 	}
 	memset(prob,0,256*sizeof(double));
@@ -65,18 +65,20 @@ void	document(void){
 	cerr<<"usage:	knnlm [options] [word1 word2 ...]\n";
 	cerr<<"\t-t:	text file=data.txt\n";
 	cerr<<"\t-k:	kmer=128\n";
+	cerr<<"\t-c:	copy rate=0.7\n";
 	cerr<<"\t-b:	benckmark chars=0\n";
 	exit(0);
 }
 
 int	main(int	ac,	char	**av){
-	string	file="data.txt";	size_t	bench=0;	kmer=128;	
+	string	file="data.txt";	size_t	bench=0;	kmer=128;	copy_rate=0.7;
 	if(ac<2)	document();
 	int	opt;
-	while((opt=getopt(ac,	av,	"t:k:b:"))>=0){
+	while((opt=getopt(ac,	av,	"t:k:b:c:"))>=0){
 		switch(opt){
 		case	't':	file=optarg;	break;
 		case	'k':	kmer=atoi(optarg);	break;
+		case	'c':	copy_rate=atof(optarg);	break;
 		case	'b':	bench=atoi(optarg);	break;
 		default:	document();
 		}
