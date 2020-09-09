@@ -20,8 +20,7 @@ int	fd;
 struct	stat	sb;
 uint8_t	*data;
 uint64_t	data_size,	threads,	seed,	kmer;
-double	mean;
-uint8_t	w[1024];
+float	w[1024];
 
 uint64_t	open_mmap(const	char	*F){
 	fd=open(F,	O_RDONLY);	if(fd<0)	return	0;
@@ -29,111 +28,75 @@ uint64_t	open_mmap(const	char	*F){
 	data=(uint8_t*)mmap(NULL,	sb.st_size,	PROT_READ,	MAP_SHARED,	fd,	0);
 	if(data==MAP_FAILED)	return	0;
 	data_size=sb.st_size;
-	return	data_size;
+	return	wyhash(data,data_size,0,_wyp);
 }
 
 void	close_mmap(void){
 	munmap(data,sb.st_size);	close(fd);
 }
 
-static	inline	double	score(uint8_t	*p,	uint8_t	*q){
-	size_t	s=0;	uint8_t	*a=p-kmer+1,	*b=q-kmer+1;
+static	inline	float	score(uint8_t	*p,	uint8_t	*q){
+	float	s=0;	uint8_t	*a=p-kmer+1,	*b=q-kmer+1;
 	for(size_t	i=0;	i<kmer;	i++)	s+=w[i]*(a[i]==b[i]);
 	return	s;
 }
 
-double	predict(uint8_t	*p,	double	*prob,	double	alpha){
-	double	pr[threads<<8]={};
+double	predict(uint8_t	*p,	double	*prob){
+	double	pr[threads<<8]={},	sw=0;
+	for(size_t	i=0;	i<kmer;	i++)	sw+=w[i];
 	#pragma omp parallel for
-	for(size_t	i=kmer-1;	i<data_size-1;	i++)	
-		if(data[i]==*p&&(data[i-1]==*(p-1)||data[i-2]==*(p-2))&&data+i!=p){
-		double	s=(score(data+i,p)-mean)*alpha;
-		s=exp(s);		
-		pr[(omp_get_thread_num()<<8)+data[i+1]]+=s;
+	for(size_t	i=kmer-1;	i<data_size-1;	i++)	if(*(uint16_t*)(data+i-1)==*(uint16_t*)(p-1)){
+		size_t	tid=omp_get_thread_num();
+		float	s=score(data+i,p);
+		if(s>0.8*sw)	continue;
+		pr[(tid<<8)+data[i+1]]+=exp(s);
 	}
 	memset(prob,0,256*sizeof(double));
 	for(size_t	i=0;	i<threads;	i++)	for(size_t	j=0;	j<256;	j++)	prob[j]+=pr[(i<<8)+j];
 	double	sp=0;
-	for(size_t	i=0;	i<256;	i++)	sp+=(prob[i]+=DBL_MIN);
+	for(size_t	i=0;	i<256;	i++)	sp+=(prob[i]+=FLT_MIN);
 	sp=1/sp;
 	for(size_t  i=0;    i<256;  i++)	prob[i]*=sp;
-	return	-log2(fmax(prob[*(p+1)],DBL_MIN));
-}
-/*
-size_t	locate(uint8_t	*p){
-	vector<vector<size_t>	>	pos(threads);
-	vector<unsigned>	bs(threads);
-	#pragma omp parallel for
-	for(size_t	i=kmer-1;	i<data_size-1;	i++)	
-		if(data[i]==*p&&(data[i-1]==*(p-1)||data[i-2]==*(p-2))&&data+i!=p){
-		unsigned	s=score(data+i,p);
-		size_t	tid=omp_get_thread_num();
-		if(s>=bs[tid]){	bs[tid]=s;	pos[tid].clear();	}
-		if(s==bs[tid])	pos[tid].push_back(i);
-	}
-
-	size_t	bbs=0;	vector<size_t>	bpos;	
-	for(size_t	i=0;	i<threads;	i++)	for(size_t	j=0;	j<pos[i].size();	j++){
-		if(bs[i]>bbs){	bbs=bs[i];	bpos.clear();	}
-		if(bs[i]==bbs)	bpos.push_back(pos[i][j]);
-	}
-	return	bpos[wyrand(&seed)%bpos.size()];
-}
-*/
-
-double	normalize(double	beta){
-	for(size_t	i=0;	i<kmer;	i++)	w[i]=powf(beta,kmer-1-i)*255;
-	seed=0;
-	double	x,	sx=0,	sxx=0,	sn=0x100000;
-	for(size_t	k=0;	k<0x100000;	k++){
-		size_t	i=wyrand(&seed)%(data_size-kmer-2)+kmer-1,j;
-		do	j=wyrand(&seed)%(data_size-kmer-2)+kmer-1;	while(j==i);
-		x=score(data+i,data+j);
-		sx+=x;	
-		sxx+=x*x;
-	}
-	sx/=sn;	mean=sx;
-	return	sqrt(sxx/sn-sx*sx);
+	return	1-prob[*(p+1)];
+//	return	-log(fmax(prob[p[1]],FLT_MIN));
 }
 
 void	document(void){
 	cerr<<"usage:	knnlm [options] [word1 word2 ...]\n";
 	cerr<<"\t-t:	text file=data.txt\n";
-	cerr<<"\t-k:	kmer=32\n";
-	cerr<<"\t-a:	sampling temperature=2.718\n";
+	cerr<<"\t-k:	kmer=128\n";
 	cerr<<"\t-b:	benckmark chars=0\n";
 	exit(0);
 }
 
 int	main(int	ac,	char	**av){
-	string	file="data.txt";	double	alpha=2.718;	size_t	bench=0;	kmer=32;	
+	string	file="data.txt";	size_t	bench=0;	kmer=128;	
 	if(ac<2)	document();
 	int	opt;
-	while((opt=getopt(ac,	av,	"t:k:a:b:"))>=0){
+	while((opt=getopt(ac,	av,	"t:k:b:"))>=0){
 		switch(opt){
 		case	't':	file=optarg;	break;
 		case	'k':	kmer=atoi(optarg);	break;
-		case	'a':	alpha=atof(optarg);	break;
 		case	'b':	bench=atoi(optarg);	break;
 		default:	document();
 		}
 	}
 	threads=omp_get_num_procs();	omp_set_num_threads(threads);
 	if(!open_mmap(file.c_str()))	return	0;
-	alpha/=normalize(exp(-log(255)/kmer));
+	ifstream	fi("weight.txt");
+	for(size_t	i=0;	i<kmer;	i++)	fi>>w[i];
+	fi.close();
 	if(!bench){
 		seed=wyhash64(time(NULL),0);		
-		ofstream	fo("article.txt");
 		vector<uint8_t>	v;
 		for(size_t	i=0;	i<kmer;	i++)	v.push_back(wyrand(&seed)&255);
 		for(int	i=optind;	i<ac;	i++){
-			for(size_t	j=0;	j<strlen(av[i]);	j++){ v.push_back(av[i][j]); fo<<av[i][j];	}
-			if(i+1<ac){	v.push_back(' ');	fo<<' ';	}
+			for(size_t	j=0;	j<strlen(av[i]);	j++)	v.push_back(av[i][j]);
+			if(i+1<ac)	v.push_back(' ');
 		}
-		fo.flush();
 		double	prob[256];
 		for(;;){
-			predict(v.data()+v.size()-1,prob,alpha);
+			predict(v.data()+v.size()-1,prob);
 			double	ran=wy2u01(wyrand(&seed)),	sum=0;
 			uint8_t	c=0;
 			for(size_t	i=0;	i<256;	i++){
@@ -142,9 +105,7 @@ int	main(int	ac,	char	**av){
 			}
 			putchar(c);	fflush(stdout);
 			v.push_back(c);
-			fo<<c;	fo.flush();
 		}
-		fo.close();
 	}
 	else{
 		seed=0;
@@ -155,12 +116,12 @@ int	main(int	ac,	char	**av){
 		for(size_t	i=0;	i<bench;	i++){
 			double	prob[256];
 			unsigned	j=wyrand(&seed)%(data_size-kmer-1)+kmer-1;
-			double	l=predict(data+j,prob,alpha);
+			double	l=predict(data+j,prob);
 			sx+=l;
 		}
 		gettimeofday(&end,NULL);
 		double	dt=end.tv_sec-beg.tv_sec+1e-6*(end.tv_usec-beg.tv_usec);
-		cerr<<"\nloss:\t"<<sx/bench<<" bits/byte\nspeed:\t"<<bench/dt<<" chars/sec\n";
+		cerr<<"\nloss:\t"<<sx/bench<<" error/byte\nspeed:\t"<<bench/dt<<" chars/sec\n";
 
 	}
 	close_mmap();
