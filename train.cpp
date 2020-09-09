@@ -20,7 +20,7 @@ int	fd;
 struct	stat	sb;
 uint8_t	*data;
 uint64_t	data_size,	threads=omp_get_num_procs(),	kmer,	seed=wyhash64(time(NULL),0);
-double	a[256]={},copy_rate;
+double	a[256]={};
 
 uint64_t	open_mmap(const	char	*F){
 	fd=open(F,	O_RDONLY);	if(fd<0)	return	0;
@@ -41,12 +41,11 @@ void	sgd(uint8_t	*p,	double	eta){
 	double	vsw[threads]={},	vsy[threads]={},	vsx[threads][kmer]={},	vsxy[threads][kmer]={};
 	double	sa=0;	for(size_t	i=0;	i<kmer;	i++)	sa+=a[i];
 	#pragma omp parallel for
-	for(size_t	i=kmer-1;	i<data_size-1;	i++)	if(*(uint16_t*)(data+i-1)==*(uint16_t*)(p-1)){
+	for(size_t	i=kmer-1;	i<data_size-1;	i++)	if(*(uint16_t*)(data+i-1)==*(uint16_t*)(p-1)&&data+i!=p){
 		size_t	t=omp_get_thread_num();
 		double	w=0;
 		uint8_t	*m=data+i-(kmer-1),	*n=p-(kmer-1);
 		for(size_t	j=0;	j<kmer;	j++)	w+=a[j]*(m[j]==n[j]);
-		if(w>copy_rate*sa)	continue;
 		w=exp(w);
 		double	y=data[i+1]==p[1];
 		vsw[t]+=w;	vsy[t]+=w*y;
@@ -73,21 +72,19 @@ void	document(void){
 	cerr<<"usage:	knnlm [options] [word1 word2 ...]\n";
 	cerr<<"\t-t:	text file=data.txt\n";
 	cerr<<"\t-k:	kmer=128\n";
-	cerr<<"\t-c:	copy rate=0.7\n";
 	cerr<<"\t-e:	eta=0.3\n";
 	cerr<<"\t-n:	step=10000\n";
 	exit(0);
 }
 
 int	main(int	ac,	char	**av){
-	string	file="data.txt";	kmer=128;	double	eta=0.3;	size_t	step=10000;	copy_rate=0.7;
+	string	file="data.txt";	kmer=128;	double	eta=0.3;	size_t	step=10000;
 	if(ac<2)	document();
 	int	opt;
-	while((opt=getopt(ac,	av,	"t:k:c:e:n:"))>=0){
+	while((opt=getopt(ac,	av,	"t:k:e:n:"))>=0){
 		switch(opt){
 		case	't':	file=optarg;	break;
 		case	'k':	kmer=atoi(optarg);	break;
-		case	'c':	copy_rate=atof(optarg);	break;
 		case	'e':	eta=atof(optarg);	break;
 		case	'n':	step=atoi(optarg);	break;
 		default:	document();
