@@ -11,18 +11,18 @@ make
 
 **Training**
 
-./train -t COVID-19
+./train COVID-19
 
 **Generate sample**
 
-./knnlm -t COVID-19 The coronavirus
+./knnlm COVID-19 The coronavirus
 
 **Benchmark language model**
 
-./knnlm -t COVID-19 -b 1000
+./knnlm COVID-19 -b 1000
 
 **Enjoy!**
 
 By Wang Yi @ Fudan University
 
-2020-09-09
+2020-09-23
