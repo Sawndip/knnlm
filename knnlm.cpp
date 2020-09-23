@@ -15,7 +15,7 @@
 #include	<cmath>
 #include	<omp.h>
 using	namespace	std;
-const	unsigned	kmer=128;
+const	unsigned	kmer=64;
 typedef    char   v8qi    __attribute__   ((__vector_size__       (8)));
 
 int	fd;
@@ -44,8 +44,7 @@ static	inline	double	score(uint8_t	*p,	uint8_t	*q){
 }
 
 double	predict(uint8_t	*p,	double	*prob){
-	double	pr[threads<<8]={},	sw=0;
-	for(size_t	i=0;	i<kmer;	i++)	sw+=w[i];
+	double	pr[threads<<8]={};
 	#pragma omp parallel for
 	for(size_t	i=kmer-1;	i<data_size-1;	i++){
 		v8qi	r=__builtin_ia32_pcmpeqb(*(v8qi*)(data+i-7),*(v8qi*)(p-7));
