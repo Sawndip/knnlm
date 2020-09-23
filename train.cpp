@@ -45,7 +45,7 @@ void	sgd(uint8_t	*p,	double	eta){
 	for(size_t	i=kmer-1;	i<data_size-1;	i++){
 	//	if(__builtin_popcountll(*(uint64_t*)&__builtin_ia32_pcmpeqb(*(v8qi*)(data+i-7),*(v8qi*)(p-7)))>=16&&data+i!=p){
 		v8qi	r=__builtin_ia32_pcmpeqb(*(v8qi*)(data+i-7),*(v8qi*)(p-7));
-		if(__builtin_popcountll(*(uint64_t*)&r)>=24&&data+i!=p){
+		if(__builtin_popcountll(*(uint64_t*)&r)>=16&&data+i!=p){
 		size_t	t=omp_get_thread_num();
 		double	w=0;
 		uint8_t	*m=data+i-(kmer-1),	*n=p-(kmer-1);

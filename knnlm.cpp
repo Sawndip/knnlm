@@ -49,7 +49,7 @@ double	predict(uint8_t	*p,	double	*prob){
 	#pragma omp parallel for
 	for(size_t	i=kmer-1;	i<data_size-1;	i++){
 		v8qi	r=__builtin_ia32_pcmpeqb(*(v8qi*)(data+i-7),*(v8qi*)(p-7));
-		if(__builtin_popcountll(*(uint64_t*)&r)>=24&&data+i!=p){
+		if(__builtin_popcountll(*(uint64_t*)&r)>=16&&data+i!=p){
 		size_t	tid=omp_get_thread_num();
 		double	s=score(data+i,p);
 		pr[(tid<<8)+data[i+1]]+=exp(s);
