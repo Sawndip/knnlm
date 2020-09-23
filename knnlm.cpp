@@ -15,12 +15,14 @@
 #include	<cmath>
 #include	<omp.h>
 using	namespace	std;
+const	unsigned	kmer=128;
+typedef    char   v8qi    __attribute__   ((__vector_size__       (8)));
 
 int	fd;
 struct	stat	sb;
 uint8_t	*data;
-uint64_t	data_size,	threads,	seed,	kmer;
-float	w[1024],	copy_rate;
+uint64_t	data_size,	threads,	seed;
+double	w[1024];
 
 uint64_t	open_mmap(const	char	*F){
 	fd=open(F,	O_RDONLY);	if(fd<0)	return	0;
@@ -35,8 +37,8 @@ void	close_mmap(void){
 	munmap(data,sb.st_size);	close(fd);
 }
 
-static	inline	float	score(uint8_t	*p,	uint8_t	*q){
-	float	s=0;	uint8_t	*a=p-kmer+1,	*b=q-kmer+1;
+static	inline	double	score(uint8_t	*p,	uint8_t	*q){
+	double	s=0;	uint8_t	*a=p-kmer+1,	*b=q-kmer+1;
 	for(size_t	i=0;	i<kmer;	i++)	s+=w[i]*(a[i]==b[i]);
 	return	s;
 }
@@ -45,11 +47,13 @@ double	predict(uint8_t	*p,	double	*prob){
 	double	pr[threads<<8]={},	sw=0;
 	for(size_t	i=0;	i<kmer;	i++)	sw+=w[i];
 	#pragma omp parallel for
-	for(size_t	i=kmer-1;	i<data_size-1;	i++)	if(*(uint16_t*)(data+i-1)==*(uint16_t*)(p-1)){
+	for(size_t	i=kmer-1;	i<data_size-1;	i++){
+		v8qi	r=__builtin_ia32_pcmpeqb(*(v8qi*)(data+i-7),*(v8qi*)(p-7));
+		if(__builtin_popcountll(*(uint64_t*)&r)>=24&&data+i!=p){
 		size_t	tid=omp_get_thread_num();
-		float	s=score(data+i,p);
-		if(s>copy_rate*sw)	continue;
+		double	s=score(data+i,p);
 		pr[(tid<<8)+data[i+1]]+=exp(s);
+		}
 	}
 	memset(prob,0,256*sizeof(double));
 	for(size_t	i=0;	i<threads;	i++)	for(size_t	j=0;	j<256;	j++)	prob[j]+=pr[(i<<8)+j];
@@ -57,42 +61,37 @@ double	predict(uint8_t	*p,	double	*prob){
 	for(size_t	i=0;	i<256;	i++)	sp+=(prob[i]+=FLT_MIN);
 	sp=1/sp;
 	for(size_t  i=0;    i<256;  i++)	prob[i]*=sp;
-	return	1-prob[*(p+1)];
-//	return	-log(fmax(prob[p[1]],FLT_MIN));
+	return	-log2(prob[p[1]]);
 }
 
 void	document(void){
-	cerr<<"usage:	knnlm [options] [word1 word2 ...]\n";
-	cerr<<"\t-t:	text file=data.txt\n";
-	cerr<<"\t-k:	kmer=128\n";
-	cerr<<"\t-c:	copy rate=0.7\n";
+	cerr<<"usage:	knnlm [options] text [word1 word2 ...]\n";
 	cerr<<"\t-b:	benckmark chars=0\n";
+	cerr<<"\t-t:	threads=0\n";
 	exit(0);
 }
 
 int	main(int	ac,	char	**av){
-	string	file="data.txt";	size_t	bench=0;	kmer=128;	copy_rate=0.7;
+	size_t	bench=0;	threads=omp_get_num_procs();
 	if(ac<2)	document();
 	int	opt;
-	while((opt=getopt(ac,	av,	"t:k:b:c:"))>=0){
+	while((opt=getopt(ac,	av,	"b:t:"))>=0){
 		switch(opt){
-		case	't':	file=optarg;	break;
-		case	'k':	kmer=atoi(optarg);	break;
-		case	'c':	copy_rate=atof(optarg);	break;
 		case	'b':	bench=atoi(optarg);	break;
+		case	't':	threads=atoi(optarg);	break;
 		default:	document();
 		}
 	}
-	threads=omp_get_num_procs();	omp_set_num_threads(threads);
-	if(!open_mmap(file.c_str()))	return	0;
-	ifstream	fi("weight.txt");
+	omp_set_num_threads(threads);
+	if(!open_mmap(av[optind]))	return	0;
+	ifstream	fi("model");
 	for(size_t	i=0;	i<kmer;	i++)	fi>>w[i];
 	fi.close();
 	if(!bench){
 		seed=wyhash64(time(NULL),0);		
 		vector<uint8_t>	v;
 		for(size_t	i=0;	i<kmer;	i++)	v.push_back(wyrand(&seed)&255);
-		for(int	i=optind;	i<ac;	i++){
+		for(int	i=optind+1;	i<ac;	i++){
 			for(size_t	j=0;	j<strlen(av[i]);	j++)	v.push_back(av[i][j]);
 			if(i+1<ac)	v.push_back(' ');
 		}
@@ -117,14 +116,13 @@ int	main(int	ac,	char	**av){
 		double	sx=0;
 		for(size_t	i=0;	i<bench;	i++){
 			double	prob[256];
-			unsigned	j=wyrand(&seed)%(data_size-kmer-1)+kmer-1;
+			unsigned	j=wyrand(&seed)%(data_size-kmer)+kmer-1;
 			double	l=predict(data+j,prob);
 			sx+=l;
 		}
 		gettimeofday(&end,NULL);
 		double	dt=end.tv_sec-beg.tv_sec+1e-6*(end.tv_usec-beg.tv_usec);
-		cerr<<"\nloss:\t"<<sx/bench<<" error/byte\nspeed:\t"<<bench/dt<<" chars/sec\n";
-
+		cerr<<"\nloss:\t"<<sx/bench<<" bits/byte\nspeed:\t"<<bench/dt<<" chars/sec\n";
 	}
 	close_mmap();
 	return	0;
