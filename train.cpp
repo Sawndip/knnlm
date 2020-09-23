@@ -15,7 +15,7 @@
 #include	<cmath>
 #include	<omp.h>
 using	namespace	std;
-const	unsigned	kmer=128;
+const	unsigned	kmer=96;
 typedef    char   v8qi    __attribute__   ((__vector_size__       (8)));
 
 int	fd;
@@ -30,7 +30,7 @@ uint64_t	open_mmap(const	char	*F){
 	data=(uint8_t*)mmap(NULL,	sb.st_size,	PROT_READ,	MAP_SHARED,	fd,	0);
 	if(data==MAP_FAILED)	return	0;
 	data_size=sb.st_size;
-	if(data_size>(1ull<<25))	data_size=(1ull<<25);
+	if(data_size>(1ull<<26))	data_size=(1ull<<26);
 	return	wyhash(data,data_size,0,_wyp);
 }
 

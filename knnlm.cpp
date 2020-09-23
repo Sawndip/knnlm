@@ -15,7 +15,7 @@
 #include	<cmath>
 #include	<omp.h>
 using	namespace	std;
-const	unsigned	kmer=64;
+const	unsigned	kmer=96;
 typedef    char   v8qi    __attribute__   ((__vector_size__       (8)));
 
 int	fd;
