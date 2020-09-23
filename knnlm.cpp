@@ -22,7 +22,7 @@ int	fd;
 struct	stat	sb;
 uint8_t	*data;
 uint64_t	data_size,	threads,	seed;
-double	w[1024];
+double	w[kmer];
 
 uint64_t	open_mmap(const	char	*F){
 	fd=open(F,	O_RDONLY);	if(fd<0)	return	0;
