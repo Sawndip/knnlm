@@ -56,7 +56,7 @@ static inline void _wymum(uint64_t *A, uint64_t *B){
   #endif
 #endif
 }
-static inline uint64_t _wymix(uint64_t A, uint64_t B){ _wymum(&A,&B); return A^B; }
+static inline uint64_t mum(uint64_t A, uint64_t B){ _wymum(&A,&B); return A^B; }
 //read functions
 #ifndef WYHASH_LITTLE_ENDIAN
   #if defined(_WIN32) || defined(__LITTLE_ENDIAN__) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
@@ -86,16 +86,16 @@ static inline uint64_t _wyfinish16(const uint8_t *p, uint64_t len, uint64_t seed
     else a=b=0;
   } 
   else{ a=_wyr8(p); b=_wyr8(p+i-8); }
-  return _wymix(secret[1]^len,_wymix(a^secret[1], b^seed));
+  return mum(secret[1]^len,mum(a^secret[1], b^seed));
 #else
   #define oneshot_shift ((i<8)*((8-i)<<3))
-  return _wymix(secret[1]^len,_wymix((_wyr8(p)<<oneshot_shift)^secret[1],(_wyr8(p+i-8)>>oneshot_shift)^seed));
+  return mum(secret[1]^len,mum((_wyr8(p)<<oneshot_shift)^secret[1],(_wyr8(p+i-8)>>oneshot_shift)^seed));
 #endif
 }
 
 static inline uint64_t _wyfinish(const uint8_t *p, uint64_t len, uint64_t seed, const uint64_t *secret, uint64_t i){
   if(_likely_(i<=16)) return _wyfinish16(p,len,seed,secret,i);
-  return _wyfinish(p+16,len,_wymix(_wyr8(p)^secret[1],_wyr8(p+8)^seed),secret,i-16);
+  return _wyfinish(p+16,len,mum(_wyr8(p)^secret[1],_wyr8(p+8)^seed),secret,i-16);
 }
 
 static inline uint64_t wyhash(const void *key, uint64_t len, uint64_t seed, const uint64_t *secret){
@@ -104,8 +104,8 @@ static inline uint64_t wyhash(const void *key, uint64_t len, uint64_t seed, cons
   if(_unlikely_(i>64)){
     uint64_t see1=seed;
     do{
-      seed=_wymix(_wyr8(p)^secret[1],_wyr8(p+8)^seed)^_wymix(_wyr8(p+16)^secret[2],_wyr8(p+24)^seed);
-      see1=_wymix(_wyr8(p+32)^secret[3],_wyr8(p+40)^see1)^_wymix(_wyr8(p+48)^secret[4],_wyr8(p+56)^see1);
+      seed=mum(_wyr8(p)^secret[1],_wyr8(p+8)^seed)^mum(_wyr8(p+16)^secret[2],_wyr8(p+24)^seed);
+      see1=mum(_wyr8(p+32)^secret[3],_wyr8(p+40)^see1)^mum(_wyr8(p+48)^secret[4],_wyr8(p+56)^see1);
       p+=64; i-=64;
     }while(i>64);
     seed^=see1;
@@ -114,8 +114,8 @@ static inline uint64_t wyhash(const void *key, uint64_t len, uint64_t seed, cons
 }
 //utility functions
 const uint64_t _wyp[5] = {0xa0761d6478bd642full, 0xe7037ed1a0b428dbull, 0x8ebc6af09c88c6e3ull, 0x589965cc75374cc3ull, 0x1d8e4e27c47d124full};
-static inline uint64_t wyhash64(uint64_t A, uint64_t B){  A^=_wyp[0]; B^=_wyp[1];  _wymum(&A,&B);  return _wymix(A^_wyp[0],B^_wyp[1]);}
-static inline uint64_t wyrand(uint64_t *seed){  *seed+=_wyp[0]; return _wymix(*seed,*seed^_wyp[1]);}
+static inline uint64_t wyhash64(uint64_t A, uint64_t B){  A^=_wyp[0]; B^=_wyp[1];  _wymum(&A,&B);  return mum(A^_wyp[0],B^_wyp[1]);}
+static inline uint64_t wyrand(uint64_t *seed){  *seed+=_wyp[0]; return mum(*seed,*seed^_wyp[1]);}
 static inline double wy2u01(uint64_t r){ const double _wynorm=1.0/(1ull<<52); return (r>>12)*_wynorm;}
 static inline double wy2gau(uint64_t r){ const double _wynorm=1.0/(1ull<<20); return ((r&0x1fffff)+((r>>21)&0x1fffff)+((r>>42)&0x1fffff))*_wynorm-3.0;}
 static inline void make_secret(uint64_t seed, uint64_t *secret){
